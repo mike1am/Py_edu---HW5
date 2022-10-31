@@ -107,12 +107,7 @@ def isOver(matr):
 # maxRate - макс. оценка для поиска лучшего хода
 # depth - текущая глубина рекурсии
 def miniMax(matr, cTurn, maxRate, depth):
-    # оценка хода в зависимости от текущей вложенности
-    if isWin(matr):
-        if cTurn: return [-maxRate + depth, 0, 0] # последний ход сделан оппонентом
-        else: return [maxRate - depth, 0, 0] # последний ход сделан алгоритмом
-    if isOver(matr): return [0, 0, 0]
-
+    # инициализация переменных для сохранения лучшего хода
     bestRate = -maxRate if cTurn else maxRate
     best_i, best_j = 0, 0
     
@@ -121,22 +116,20 @@ def miniMax(matr, cTurn, maxRate, depth):
             if not bool(matr[i][j]):
                 matr[i][j] = int(not cTurn) + 1 # предполагаемый ход
                 
-                rate = miniMax(matr, not cTurn, maxRate, depth + 1)[0]
+                if isWin(matr):
+                    if cTurn: rate = maxRate - depth # расчёт оценки с учётом вложенности, т.е. "отдалённости" результата
+                    else: rate = -maxRate + depth
+                elif isOver(matr):
+                    rate = 0
+                else:
+                    rate = miniMax(matr, not cTurn, maxRate, depth + 1)[0] # если нет терм. состояния, получаем оценку с учётом след. хода соперника
 
-                # поиск лучшего хода в зависимости от cTurn
-                if cTurn and rate > bestRate:
+                # сохранение лучшего хода
+                if (cTurn and rate > bestRate) or (not cTurn and rate < bestRate) \
+                    or (cTurn and rate == bestRate and not bool(random.choice(range(maxRate)))): # для вариабельности поведения
                     bestRate = rate
-                    best_i = i
-                    best_j = j
-                elif cTurn and rate == bestRate: # для вариабельности поведения
-                    if not bool(random.choice(range(maxRate))):
-                        best_i = i
-                        best_j = j
-                elif not cTurn and rate < bestRate:
-                    bestRate = rate
-                    best_i = i
-                    best_j = j
-            
+                    best_i, best_j = i, j
+                
                 matr[i][j] = 0 # освобождение поля
 
     return (bestRate, best_i, best_j)
@@ -148,7 +141,7 @@ def compTurn (gameMatrix, sign):
     else:
         testMatrix = list(map(lambda row: list(map(lambda el: (0, 2, 1)[el], row)), gameMatrix)) # ставит 1 для компьютера, 2 - для игрока
 
-    maxRate = len(gameMatrix) * len(gameMatrix[0]) + 1 # макс. оценка хода в зависимости от числа полей
+    maxRate = len(gameMatrix) * len(gameMatrix[0]) # макс. оценка хода в зависимости от числа полей
         
     nextTurn = miniMax(testMatrix, True, maxRate, 0)
     
