@@ -103,10 +103,12 @@ def isOver(matr):
 
 # Рекурсивная функция поиска лучшего хода
 # matr содержит 0 для свободных полей, 1 - предполагаемые и сделанные ходы алгоритма, 2 - ходы оппонента
+# avTurns - список кортежей со свободными полями (для оптимизации)
 # cTurn = True - моделирование хода алгоритма, False - хода оппонента
 # maxRate - макс. оценка для поиска лучшего хода
 # depth - текущая глубина рекурсии
-def miniMax(matr, cTurn, maxRate, depth, alpha = 0, beta = 0):
+# alpha, beta - критерии для отсечения заведомо лишних ветвей, при первом (нерекурс.) вызове не требуются
+def miniMax(matr, avTurns, cTurn, maxRate, depth, alpha = 0, beta = 0):
     # инициализация переменных для сохранения лучшего хода
     bestRate = -maxRate if cTurn else maxRate
     best_i, best_j = 0, 0
@@ -114,31 +116,34 @@ def miniMax(matr, cTurn, maxRate, depth, alpha = 0, beta = 0):
         alpha = -maxRate
         beta = maxRate
 
-    for i in range(len(matr)): # проход по свободным полям
-        for j in range(len(matr[0])):
-            if not bool(matr[i][j]):
-                matr[i][j] = int(not cTurn) + 1 # предполагаемый ход
-                
-                if isWin(matr):
-                    if cTurn: rate = maxRate - depth # расчёт оценки с учётом вложенности, т.е. "отдалённости" результата
-                    else: rate = -maxRate + depth
-                elif isOver(matr):
-                    rate = 0
-                else:
-                    rate = miniMax(matr, not cTurn, maxRate, depth + 1, alpha, beta)[0] # если нет терм. состояния, получаем оценку с учётом след. хода соперника
+    for avInd in range(len(avTurns)): # проход по свободным полям
+        i, j = avTurns[avInd]
+        avTurns.pop(avInd)
+        
+        matr[i][j] = int(not cTurn) + 1 # предполагаемый ход
+        
+        if isWin(matr):
+            if cTurn: rate = maxRate - depth # расчёт оценки с учётом вложенности, т.е. "отдалённости" результата
+            else: rate = -maxRate + depth
+        elif isOver(matr):
+            rate = 0
+        else:
+            # если нет терм. состояния, получаем оценку с учётом след. хода соперника
+            rate = miniMax(matr, avTurns, not cTurn, maxRate, depth + 1, alpha, beta)[0]
 
-                # сохранение лучшего хода
-                if (cTurn and rate > bestRate) or (not cTurn and rate < bestRate) \
-                    or (cTurn and rate == bestRate and not bool(random.choice(range(maxRate)))): # для вариабельности поведения
-                    bestRate = rate
-                    best_i, best_j = i, j
-                
-                matr[i][j] = 0 # освобождение поля
+        # сохранение лучшего хода
+        if (cTurn and rate > bestRate) or (not cTurn and rate < bestRate) \
+            or (cTurn and rate == bestRate and not bool(random.choice(range(maxRate)))): # для вариабельности поведения
+            bestRate = rate
+            best_i, best_j = i, j
+        
+        matr[i][j] = 0 # освобождение поля
+        avTurns.insert(avInd, (i, j))
 
-                if cTurn: alpha = bestRate
-                else: beta = bestRate
-                
-                if alpha >= beta: return (bestRate, best_i, best_j)
+        # обновление и отсечка по alpha-beta
+        if cTurn and alpha < bestRate: alpha = bestRate
+        elif not cTurn and beta > bestRate: beta = bestRate
+        if alpha >= beta: break
 
     return (bestRate, best_i, best_j)
 
@@ -150,8 +155,14 @@ def compTurn (gameMatrix, sign):
         testMatrix = list(map(lambda row: list(map(lambda el: (0, 2, 1)[el], row)), gameMatrix)) # ставит 1 для компьютера, 2 - для игрока
 
     maxRate = len(gameMatrix) * len(gameMatrix[0]) # макс. оценка хода в зависимости от числа полей
-        
-    nextTurn = miniMax(testMatrix, True, maxRate, 0)
+    
+    availTurns = []
+    for row in range(len(testMatrix)):
+        for col in range(len(testMatrix[0])):
+            if not bool(testMatrix[row][col]):
+                availTurns.append((row, col))
+
+    nextTurn = miniMax(testMatrix, availTurns, True, maxRate, 0)
     
     gameMatrix[nextTurn[1]][nextTurn[2]] = sign + 1
 
