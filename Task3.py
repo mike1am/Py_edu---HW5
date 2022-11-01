@@ -106,11 +106,14 @@ def isOver(matr):
 # cTurn = True - моделирование хода алгоритма, False - хода оппонента
 # maxRate - макс. оценка для поиска лучшего хода
 # depth - текущая глубина рекурсии
-def miniMax(matr, cTurn, maxRate, depth):
+def miniMax(matr, cTurn, maxRate, depth, alpha = 0, beta = 0):
     # инициализация переменных для сохранения лучшего хода
     bestRate = -maxRate if cTurn else maxRate
     best_i, best_j = 0, 0
-    
+    if not bool(depth):
+        alpha = -maxRate
+        beta = maxRate
+
     for i in range(len(matr)): # проход по свободным полям
         for j in range(len(matr[0])):
             if not bool(matr[i][j]):
@@ -122,7 +125,7 @@ def miniMax(matr, cTurn, maxRate, depth):
                 elif isOver(matr):
                     rate = 0
                 else:
-                    rate = miniMax(matr, not cTurn, maxRate, depth + 1)[0] # если нет терм. состояния, получаем оценку с учётом след. хода соперника
+                    rate = miniMax(matr, not cTurn, maxRate, depth + 1, alpha, beta)[0] # если нет терм. состояния, получаем оценку с учётом след. хода соперника
 
                 # сохранение лучшего хода
                 if (cTurn and rate > bestRate) or (not cTurn and rate < bestRate) \
@@ -131,6 +134,11 @@ def miniMax(matr, cTurn, maxRate, depth):
                     best_i, best_j = i, j
                 
                 matr[i][j] = 0 # освобождение поля
+
+                if cTurn: alpha = bestRate
+                else: beta = bestRate
+                
+                if alpha >= beta: return (bestRate, best_i, best_j)
 
     return (bestRate, best_i, best_j)
 
