@@ -15,43 +15,28 @@ def inputNatural (prompt, lim = 0):
                 print("Вы ввели слишком большое число. Попробуйте ещё раз.")
 
 def outputGameField (gameMatrix):
-    outStr = "╔"
-    for _ in range(len(gameMatrix[0]) - 1): outStr += "═══╤"
-    outStr += "═══╗"
-    print(outStr)
-
     for row in range(len(gameMatrix)):
-        outStr = "║"
+        if row > 0:
+            print("".join("-" for _ in range(len(gameMatrix) * 4 - 1)))
+        
         for col in range(len(gameMatrix[0])): 
+            if col == 0: outStr = ""
+            else: outStr += "|"
+                    
             if gameMatrix[row][col] == 0:
                 outStr += str(row * len(gameMatrix[0]) + col + 1).center(3)
             elif gameMatrix[row][col] == 1:
-                outStr += " + "
+                outStr += "\033[1m\033[95m + \033[0m"
             else:
-                outStr += " O "
-            if col < len(gameMatrix[0]) - 1:
-                outStr += "│"
-            else:
-                outStr += "║"
+                outStr += "\033[1m\033[95m 0 \033[0m"
         print(outStr)
-
-        if row < len(gameMatrix) - 1:
-            outStr = "╟"
-            for _ in range(len(gameMatrix[0]) - 1): outStr += "───┼"
-            outStr += "───╢"
-            print(outStr)
-        else:
-            outStr = "╚"
-            for _ in range(len(gameMatrix[0]) - 1): outStr += "═══╧"
-            outStr += "═══╝"
-            print(outStr)
 
 # Ход человека. sign = 0 - ставим +, 1 - O
 # gameMatrix содержит 0 для свободных полей, 1 - ходы 1 игрока, 2 - ходы 2 игрока
 def humanTurn (gameMatrix, sign):
     outputGameField(gameMatrix)
     
-    signChar = ("+", "O")[sign]
+    signChar = ("+", "0")[sign]
     print(f"Введите номер поля, куда хотите поставить {signChar}")
     
     while True:
@@ -98,7 +83,7 @@ def isWin(gameMatrix):
 def isOver(matr):
     for row in matr:
         for el in row:
-            if not bool(el): return False
+            if el == 0: return False
     return True
 
 # Рекурсивная функция поиска лучшего хода
@@ -111,8 +96,9 @@ def isOver(matr):
 def miniMax(matr, avTurns, cTurn, maxRate, depth, alpha = 0, beta = 0):
     # инициализация переменных для сохранения лучшего хода
     bestRate = -maxRate if cTurn else maxRate
-    best_i, best_j = 0, 0
-    if not bool(depth):
+    best_i = 0
+    best_j = 0
+    if depth == 0:
         alpha = -maxRate
         beta = maxRate
 
@@ -159,7 +145,7 @@ def compTurn (gameMatrix, sign):
     availTurns = []
     for row in range(len(testMatrix)):
         for col in range(len(testMatrix[0])):
-            if not bool(testMatrix[row][col]):
+            if testMatrix[row][col] == 0:
                 availTurns.append((row, col))
 
     nextTurn = miniMax(testMatrix, availTurns, True, maxRate, 0)
