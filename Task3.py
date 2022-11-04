@@ -1,5 +1,6 @@
 import random
 import copy
+from functools import reduce
 
 def inputNatural (prompt, lim = 0):
     while True:
@@ -27,29 +28,9 @@ def outputGameField (gameMatrix):
                 outStr += str(row * len(gameMatrix[0]) + col + 1).center(3)
             elif gameMatrix[row][col] == 1:
                 outStr += "\033[1m\033[95m + \033[0m"
-            else:
+            else: 
                 outStr += "\033[1m\033[95m 0 \033[0m"
         print(outStr)
-
-# Ход человека. sign = 0 - ставим +, 1 - O
-# gameMatrix содержит 0 для свободных полей, 1 - ходы 1 игрока, 2 - ходы 2 игрока
-def humanTurn (gameMatrix, sign):
-    outputGameField(gameMatrix)
-    
-    signChar = ("+", "0")[sign]
-    print(f"Введите номер поля, куда хотите поставить {signChar}")
-    
-    while True:
-        elInd = inputNatural("==> ", len(gameMatrix) * len(gameMatrix[0]))
-        
-        i = (elInd - 1) // len(gameMatrix[0])
-        j = elInd % len(gameMatrix) - 1
-
-        if gameMatrix[i][j] == 0:
-            gameMatrix[i][j] = sign + 1
-            return
-        else:
-            print("Это поле занято. Попробуйте ещё раз.")
 
 # Проверка списка чисел на одинаковые значения
 def isSameNums (numList):
@@ -81,10 +62,32 @@ def isWin(gameMatrix):
 
 # Проверка на отсутствие свободных (нулевых) полей
 def isOver(matr):
-    for row in matr:
-        for el in row:
-            if el == 0: return False
-    return True
+    return reduce(lambda acc, rowRes: acc and rowRes, [reduce(lambda acc, el: acc and bool(el), row, True) for row in matr], True)
+
+# Ход человека. sign = 0 - ставим +, 1 - O
+# gameMatrix содержит 0 для свободных полей, 1 - ходы 1 игрока, 2 - ходы 2 игрока
+def humanTurn (gameMatrix, sign):
+    outputGameField(gameMatrix)
+    
+    signChar = ("+", "0")[sign]
+    print(f"Введите номер поля, куда хотите поставить {signChar}")
+    print(f"{len(gameMatrix) * len(gameMatrix[0]) + 1} - ход за Вас сделает компьютер")
+    
+    while True:
+        elInd = inputNatural("==> ", len(gameMatrix) * len(gameMatrix[0]) + 1)
+        
+        if elInd == len(gameMatrix) * len(gameMatrix[0]) + 1:
+            compTurn(gameMatrix, sign)
+            return
+        
+        i = (elInd - 1) // len(gameMatrix[0])
+        j = elInd % len(gameMatrix) - 1
+
+        if gameMatrix[i][j] == 0:
+            gameMatrix[i][j] = sign + 1
+            return
+        else:
+            print("Это поле занято. Попробуйте ещё раз.")
 
 # Рекурсивная функция поиска лучшего хода
 # matr содержит 0 для свободных полей, 1 - предполагаемые и сделанные ходы алгоритма, 2 - ходы оппонента
@@ -94,7 +97,10 @@ def isOver(matr):
 # depth - текущая глубина рекурсии
 # alpha, beta - критерии для отсечения заведомо лишних ветвей, при первом (нерекурс.) вызове не требуются
 def miniMax(matr, avTurns, cTurn, maxRate, depth, alpha = 0, beta = 0):
-    # инициализация переменных для сохранения лучшего хода
+    # global miniMaxCallCnt
+    # global alphaBetaPrunCnt
+    # miniMaxCallCnt += 1
+
     bestRate = -maxRate if cTurn else maxRate
     best_i = 0
     best_j = 0
@@ -106,35 +112,43 @@ def miniMax(matr, avTurns, cTurn, maxRate, depth, alpha = 0, beta = 0):
         i, j = avTurns[avInd]
         avTurns.pop(avInd)
         
-        matr[i][j] = int(not cTurn) + 1 # предполагаемый ход
+        matr[i][j] = int(not cTurn) + 1
         
         if isWin(matr):
             if cTurn: rate = maxRate - depth # расчёт оценки с учётом вложенности, т.е. "отдалённости" результата
             else: rate = -maxRate + depth
-        elif isOver(matr):
+        elif len(avTurns) == 0:
             rate = 0
         else:
-            # если нет терм. состояния, получаем оценку с учётом след. хода соперника
             rate = miniMax(matr, avTurns, not cTurn, maxRate, depth + 1, alpha, beta)[0]
 
-        # сохранение лучшего хода
-        if (cTurn and rate > bestRate) or (not cTurn and rate < bestRate) \
-            or (cTurn and rate == bestRate and not bool(random.choice(range(maxRate)))): # для вариабельности поведения
+        if cTurn and rate > bestRate or not cTurn and rate < bestRate:
             bestRate = rate
+            best_i, best_j = i, j
+        elif depth == 0 and cTurn and rate == bestRate and not bool(random.choice(range(len(avTurns)))): # для вариабельности поведения
             best_i, best_j = i, j
         
         matr[i][j] = 0 # освобождение поля
         avTurns.insert(avInd, (i, j))
 
-        # обновление и отсечка по alpha-beta
-        if cTurn and alpha < bestRate: alpha = bestRate
+        # При обновлении alpha на уровне depth == 0 не гарантируется достоверность возвращаемых оценок rate, если rate == bestRate,
+        # при отсечении по условию alpha >= beta, что, при выполнении условия вариабельности (см. выше), может приводить к выбору неправильного хода.
+        # Другое решение - заменить условием alpha > beta - приводит к увелич. в более, чем 3 раза кол. итераций miniMax
+        if cTurn and alpha < bestRate and depth > 0: alpha = bestRate
         elif not cTurn and beta > bestRate: beta = bestRate
-        if alpha >= beta: break
+        if alpha >= beta:
+            # alphaBetaPrunCnt += 1
+            break # отсечение ходов, не влияющих на оценку
 
     return (bestRate, best_i, best_j)
 
 # Ход компьютера (параметры - см. humanTurn)
 def compTurn (gameMatrix, sign):
+    # global miniMaxCallCnt
+    # global alphaBetaPrunCnt
+    # miniMaxCallCnt = 0
+    # alphaBetaPrunCnt = 0
+
     if not bool(sign):
         testMatrix = copy.deepcopy(gameMatrix)
     else:
@@ -142,15 +156,16 @@ def compTurn (gameMatrix, sign):
 
     maxRate = len(gameMatrix) * len(gameMatrix[0]) # макс. оценка хода в зависимости от числа полей
     
-    availTurns = []
-    for row in range(len(testMatrix)):
-        for col in range(len(testMatrix[0])):
-            if testMatrix[row][col] == 0:
-                availTurns.append((row, col))
+    # формирование списка возможных ходов - для ускорения
+    availTurns = [(i, j) for i in range(len(testMatrix)) for j in range(len(testMatrix[0])) if testMatrix[i][j] == 0]
 
     nextTurn = miniMax(testMatrix, availTurns, True, maxRate, 0)
+
+    # print(f"Common     --> {miniMaxCallCnt}")
+    # print(f"Alpha-Beta --> {alphaBetaPrunCnt}")
     
     gameMatrix[nextTurn[1]][nextTurn[2]] = sign + 1
+    return
 
 
 dim = inputNatural("Введите размер поля: ")
